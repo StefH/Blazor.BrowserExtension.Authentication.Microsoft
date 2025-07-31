@@ -27,8 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="JsBind.Net" Version="2.1.1" PrivateAssets="contentfiles" />
-    <PackageReference Include="JsBind.Net.Extensions.DependencyInjection" Version="2.1.1" PrivateAssets="contentfiles" />
+    <PackageReference Include="JsBind.Net" Version="2.0.1" PrivateAssets="contentfiles" />
+    <PackageReference Include="JsBind.Net.Extensions.DependencyInjection" Version="2.0.1" PrivateAssets="contentfiles" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.7" />
   </ItemGroup>
 
@@ -37,10 +37,6 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Properties\" />
   </ItemGroup>
 
 </Project>
