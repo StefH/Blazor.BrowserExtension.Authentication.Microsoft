@@ -93,6 +93,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         await _storage.SetAsync(new Dictionary<string, object>
         {
+            { "tokenType", token.TokenType },
             { "accessToken", token.AccessToken },
             { "refreshToken", token.RefreshToken },
             { "tokenExpiry", (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + token.ExpiresIn * 1000).ToString() },

@@ -1,6 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
+// ReSharper disable once CheckNamespace
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 
 public static class ChromeStorageLocalExtensions
