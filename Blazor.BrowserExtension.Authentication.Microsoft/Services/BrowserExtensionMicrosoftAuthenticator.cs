@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -9,11 +10,13 @@ using System.Web;
 using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 
 internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicrosoftAuthenticator
 {
+    private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
     private readonly ChromeIdentity _chromeIdentity;
     private readonly ChromeStorageLocal _storage;
 
@@ -25,7 +28,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     private string? _pkceCodeVerifier;
     private string? _redirectUrl;
 
-    public BrowserExtensionMicrosoftAuthenticator(IConfiguration config, ChromeIdentity chromeIdentity, ChromeStorageLocal storage)
+    public BrowserExtensionMicrosoftAuthenticator(ILogger<BrowserExtensionMicrosoftAuthenticator> logger, IConfiguration config, ChromeIdentity chromeIdentity, ChromeStorageLocal storage)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
@@ -36,13 +39,14 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         _authUrl = $"{authority}/oauth2/v2.0/authorize";
         _tokenUrl = $"{authority}/oauth2/v2.0/token";
 
+        _logger = logger;
         _chromeIdentity = chromeIdentity;
         _storage = storage;
     }
 
     public async Task<TokenResponse> AuthenticateAsync()
     {
-        Console.WriteLine("Starting Microsoft OAuth flow...");
+        _logger.LogInformation("Starting Microsoft OAuth flow");
 
         _redirectUrl = await _chromeIdentity.GetRedirectUrlAsync();
 
@@ -61,30 +65,23 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
                     $"&code_challenge_method=S256"
         }.Uri;
 
-        Console.WriteLine($"Authorization URL: {authUri}");
-
         var responseUrl = (await _chromeIdentity.LaunchInteractiveWebAuthFlowAsync(authUri.ToString()))!;
-
-        Console.WriteLine($"ResponseUrl: {responseUrl}");
+        _logger.LogDebug("ResponseUrl: {ResponseUrl}", responseUrl);
 
         var code = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("code");
         var error = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("error");
 
         if (!string.IsNullOrEmpty(error))
         {
-            throw new Exception($"OAuth error: {error}");
+            throw new AuthenticationException($"OAuth error: {error}");
         }
 
         if (string.IsNullOrEmpty(code))
         {
-            throw new Exception("No authorization code received.");
+            throw new AuthenticationException("No authorization code received.");
         }
 
-        Console.WriteLine($"Authorization code received:': {code}");
-
         var token = await ExchangeCodeForTokensAsync(code);
-
-        Console.WriteLine($"token: {JsonSerializer.Serialize(token)}");
 
         if (!string.IsNullOrWhiteSpace(token.IdToken))
         {
@@ -125,7 +122,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error checking authentication: " + ex.Message);
+            _logger.LogError(ex, "Error checking authentication");
             return false;
         }
     }
@@ -158,7 +155,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error getting current user: " + ex.Message);
+            _logger.LogWarning(ex, "Error getting current user");
             return null;
         }
     }
@@ -185,7 +182,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             var error = JsonSerializer.Deserialize<OAuthError>(json);
             throw new Exception($"Token exchange failed: {error?.ErrorDescription ?? error?.Error}");
         }
-        Console.WriteLine($"json: {json}");
+
         return JsonSerializer.Deserialize<TokenResponse>(json)!;
     }
 
