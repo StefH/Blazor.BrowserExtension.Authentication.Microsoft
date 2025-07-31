@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>0.0.1-preview-01</Version>
+    <Descrioption>This package adds Microsoft Authentication to a Blazor.BrowserExtension using chrome.identity.launchWebAuthFlow functionality.</Descrioption>
+    <TargetFramework>net8.0</TargetFramework>
+    <!--<ImplicitUsings>enable</ImplicitUsings>-->
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Copyright>Copyright © Stef Heyenrath</Copyright>
+    <Authors>Stef Heyenrath</Authors>
+    <PackageIcon>Icon_128x128.png</PackageIcon>
+    <!--<PackageReleaseNotes>$([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/../../PackageReleaseNotes.txt"))</PackageReleaseNotes>-->
+    <PackageProjectUrl>https://github.com/StefH/Blazor.BrowserExtension.Authentication.Microsoft</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/StefH/Blazor.BrowserExtension.Authentication.Microsoft</RepositoryUrl>
+    <!--<PackageReadmeFile>PackageReadme.md</PackageReadmeFile>-->
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../resources/Icon_128x128.png" Pack="true" PackagePath="" />
+    <!--<None Include="../../PackageReadme.md" Pack="true" PackagePath="" />-->
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsBind.Net" Version="2.1.1" PrivateAssets="contentfiles" />
+    <PackageReference Include="JsBind.Net.Extensions.DependencyInjection" Version="2.1.1" PrivateAssets="contentfiles" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
+</Project>
