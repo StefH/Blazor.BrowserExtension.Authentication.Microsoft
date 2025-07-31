@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Version>0.0.1-preview-01</Version>
-    <Descrioption>This package adds Microsoft Authentication to a Blazor.BrowserExtension using chrome.identity.launchWebAuthFlow functionality.</Descrioption>
+    <Description>This package adds Microsoft Authentication to a Blazor.BrowserExtension using chrome.identity.launchWebAuthFlow functionality.</Description>
     <TargetFramework>net8.0</TargetFramework>
     <!--<ImplicitUsings>enable</ImplicitUsings>-->
     <Nullable>enable</Nullable>
