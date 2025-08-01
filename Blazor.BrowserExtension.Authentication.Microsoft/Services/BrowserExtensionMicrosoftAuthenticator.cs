@@ -58,7 +58,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             Query = $"client_id={_clientId}" +
                     $"&response_type=code" +
                     $"&redirect_uri={HttpUtility.UrlEncode(_redirectUrl)}" +
-                    $"&scope={HttpUtility.UrlEncode(string.Join(' ', _scopes))}" +
+                    $"&scope={HttpUtility.UrlEncode(_scopes)}" +
                     $"&response_mode=query" +
                     $"&state={GenerateRandomState()}" +
                     $"&code_challenge={codeChallenge}" +
