@@ -1,0 +1,29 @@
+name: Build and Test
+
+on: 
+  pull_request:
+    branches:
+      - '**'
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build-and-test:
+    name: Build and Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-2022, ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+  
+    - name: Setup .NET 10 Preview 6 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.100-preview.6.25358.103'
+        include-prerelease: true
+
+    - name: 'Build'
+      run: dotnet build 'Blazor BrowserExtension Authentication.sln' -c Release
