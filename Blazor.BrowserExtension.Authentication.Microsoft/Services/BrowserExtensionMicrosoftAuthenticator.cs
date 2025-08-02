@@ -88,13 +88,14 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             token.UserProfile = ParseIdToken(token.IdToken);
         }
 
-        await _storage.SetAsync(new Dictionary<string, object>
+        await _storage.SetAsync(new Dictionary<string, object?>
         {
             { "tokenType", token.TokenType },
             { "accessToken", token.AccessToken },
             { "refreshToken", token.RefreshToken },
             { "tokenExpiry", (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + token.ExpiresIn * 1000).ToString() },
-            { "idToken", token.IdToken }
+            { "idToken", token.IdToken },
+            { "userProfile", token.UserProfile }
         });
 
         return token;
@@ -102,48 +103,45 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<bool> IsAuthenticatedAsync()
     {
+        return string.IsNullOrWhiteSpace(await GetAccessTokenAsync());
+    }
+
+    public async Task<string?> GetAccessTokenAsync()
+    {
         try
         {
             var accessToken = await _storage.GetAccessTokenAsync();
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                _logger.LogWarning("Access token is not available.");
+                return null;
+            }
+
             var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-
-            if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(expiryStr))
+            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             {
-                return false;
+                _logger.LogWarning("Access token has expired or is invalid.");
+                return null;
             }
 
-            if (!long.TryParse(expiryStr, out var expiry))
-            {
-                return false;
-            }
-
-            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            return expiry > now;
+            return accessToken;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking authentication");
-            return false;
+            _logger.LogWarning(ex, "Error getting access token");
+            return null;
         }
     }
 
     public async Task<UserProfile?> GetCurrentUserAsync()
     {
+        if (string.IsNullOrWhiteSpace(await GetAccessTokenAsync()))
+        {
+            return null;
+        }
+
         try
         {
-            var accessToken = await _storage.GetAccessTokenAsync();
-            var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-
-            if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(expiryStr))
-            {
-                return null;
-            }
-
-            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-            {
-                return null;
-            }
-
             var userJson = await _storage.GetSingleStringAsync("userProfile");
             if (string.IsNullOrWhiteSpace(userJson))
             {
