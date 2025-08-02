@@ -120,7 +120,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
             if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             {
-                _logger.LogWarning("Access token has expired or is invalid.");
+                _logger.LogWarning("Access token has expired or is invalid. Expiry: {TokenExpiry}", expiry);
                 return null;
             }
 
