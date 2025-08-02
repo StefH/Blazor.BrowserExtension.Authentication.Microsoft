@@ -103,7 +103,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<bool> IsAuthenticatedAsync()
     {
-        return string.IsNullOrWhiteSpace(await GetAccessTokenAsync());
+        return !string.IsNullOrWhiteSpace(await GetAccessTokenAsync());
     }
 
     public async Task<string?> GetAccessTokenAsync()
