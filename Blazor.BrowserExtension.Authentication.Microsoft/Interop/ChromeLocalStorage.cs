@@ -5,7 +5,7 @@ using StorageData = System.Collections.Generic.Dictionary<string, object?>;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 
-public sealed class ChromeStorageLocal : ObjectBindingBase
+internal sealed class ChromeStorageLocal : ObjectBindingBase, IChromeStorageLocal
 {
     public ChromeStorageLocal(IJsRuntimeAdapter jsRuntime)
     {

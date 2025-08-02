@@ -17,8 +17,8 @@ namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicrosoftAuthenticator
 {
     private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
-    private readonly ChromeIdentity _chromeIdentity;
-    private readonly ChromeStorageLocal _storage;
+    private readonly IChromeIdentity _chromeIdentity;
+    private readonly IChromeStorageLocal _storage;
 
     private readonly string _clientId;
     private readonly string _scopes;
@@ -28,7 +28,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     private string? _pkceCodeVerifier;
     private string? _redirectUrl;
 
-    public BrowserExtensionMicrosoftAuthenticator(ILogger<BrowserExtensionMicrosoftAuthenticator> logger, IConfiguration config, ChromeIdentity chromeIdentity, ChromeStorageLocal storage)
+    public BrowserExtensionMicrosoftAuthenticator(ILogger<BrowserExtensionMicrosoftAuthenticator> logger, IConfiguration config, IChromeIdentity chromeIdentity, IChromeStorageLocal storage)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
