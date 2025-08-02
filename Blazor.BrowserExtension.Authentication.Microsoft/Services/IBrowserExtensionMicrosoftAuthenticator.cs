@@ -9,5 +9,11 @@ public interface IBrowserExtensionMicrosoftAuthenticator
 
     Task<bool> IsAuthenticatedAsync();
 
+    /// <summary>
+    /// Retrieves the Access Token from the Chrome Local Storage.
+    /// In case the token is not available or expired, it will return null.
+    /// </summary>
+    Task<string?> GetAccessTokenAsync();
+
     Task<UserProfile?> GetCurrentUserAsync();
 }

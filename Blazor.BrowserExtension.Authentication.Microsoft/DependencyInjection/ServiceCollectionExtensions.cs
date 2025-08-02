@@ -17,8 +17,8 @@ public static class ServiceCollectionExtensions
      
         return services
             .AddJsBind()
-            .AddSingleton<ChromeStorageLocal>()
-            .AddSingleton<ChromeIdentity>()
+            .AddSingleton<IChromeStorageLocal, ChromeStorageLocal>()
+            .AddSingleton<IChromeIdentity, ChromeIdentity>()
             .AddSingleton<IBrowserExtensionMicrosoftAuthenticator, BrowserExtensionMicrosoftAuthenticator>();
     }
 }
