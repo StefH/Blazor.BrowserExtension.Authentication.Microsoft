@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Http;
 using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,9 +15,12 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMicrosoftAuthentication(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-     
+
+        services.AddHttpClient(nameof(BrowserExtensionMicrosoftAuthenticator));
+
         return services
             .AddJsBind()
+            .AddSingleton<IIHttpClientFactory, HttpClientFactoryService>()
             .AddSingleton<IChromeStorageLocal, ChromeStorageLocal>()
             .AddSingleton<IChromeIdentity, ChromeIdentity>()
             .AddSingleton<IBrowserExtensionMicrosoftAuthenticator, BrowserExtensionMicrosoftAuthenticator>();

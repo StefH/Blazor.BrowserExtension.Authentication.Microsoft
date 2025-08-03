@@ -17,6 +17,7 @@ namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicrosoftAuthenticator
 {
     private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
+    private readonly IIHttpClientFactory _httpClientFactory;
     private readonly IChromeIdentity _chromeIdentity;
     private readonly IChromeStorageLocal _storage;
 
@@ -28,7 +29,12 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     private string? _pkceCodeVerifier;
     private string? _redirectUrl;
 
-    public BrowserExtensionMicrosoftAuthenticator(ILogger<BrowserExtensionMicrosoftAuthenticator> logger, IConfiguration config, IChromeIdentity chromeIdentity, IChromeStorageLocal storage)
+    public BrowserExtensionMicrosoftAuthenticator(
+        ILogger<BrowserExtensionMicrosoftAuthenticator> logger,
+        IConfiguration config,
+        IIHttpClientFactory httpClientFactory,
+        IChromeIdentity chromeIdentity,
+        IChromeStorageLocal storage)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
@@ -40,6 +46,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         _tokenUrl = $"{authority}/oauth2/v2.0/token";
 
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
         _chromeIdentity = chromeIdentity;
         _storage = storage;
     }
@@ -160,7 +167,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     private async Task<TokenResponse> ExchangeCodeForTokensAsync(string code)
     {
-        using var client = new HttpClient();
+        using var client = _httpClientFactory.CreateClient(nameof(BrowserExtensionMicrosoftAuthenticator));
 
         var content = new FormUrlEncodedContent(
         [
