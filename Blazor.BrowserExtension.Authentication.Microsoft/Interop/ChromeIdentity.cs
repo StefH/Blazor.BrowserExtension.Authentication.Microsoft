@@ -3,7 +3,7 @@ using JsBind.Net;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 
-public sealed class ChromeIdentity : ObjectBindingBase
+internal sealed class ChromeIdentity : ObjectBindingBase, IChromeIdentity
 {
     public ChromeIdentity(IJsRuntimeAdapter jsRuntime)
     {

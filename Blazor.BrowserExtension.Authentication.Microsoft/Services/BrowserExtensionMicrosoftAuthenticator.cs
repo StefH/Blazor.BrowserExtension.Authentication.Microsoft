@@ -17,8 +17,9 @@ namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicrosoftAuthenticator
 {
     private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
-    private readonly ChromeIdentity _chromeIdentity;
-    private readonly ChromeStorageLocal _storage;
+    private readonly IIHttpClientFactory _httpClientFactory;
+    private readonly IChromeIdentity _chromeIdentity;
+    private readonly IChromeStorageLocal _storage;
 
     private readonly string _clientId;
     private readonly string _scopes;
@@ -28,7 +29,12 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     private string? _pkceCodeVerifier;
     private string? _redirectUrl;
 
-    public BrowserExtensionMicrosoftAuthenticator(ILogger<BrowserExtensionMicrosoftAuthenticator> logger, IConfiguration config, ChromeIdentity chromeIdentity, ChromeStorageLocal storage)
+    public BrowserExtensionMicrosoftAuthenticator(
+        ILogger<BrowserExtensionMicrosoftAuthenticator> logger,
+        IConfiguration config,
+        IIHttpClientFactory httpClientFactory,
+        IChromeIdentity chromeIdentity,
+        IChromeStorageLocal storage)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
@@ -40,6 +46,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         _tokenUrl = $"{authority}/oauth2/v2.0/token";
 
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
         _chromeIdentity = chromeIdentity;
         _storage = storage;
     }
@@ -88,13 +95,14 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             token.UserProfile = ParseIdToken(token.IdToken);
         }
 
-        await _storage.SetAsync(new Dictionary<string, object>
+        await _storage.SetAsync(new Dictionary<string, object?>
         {
             { "tokenType", token.TokenType },
             { "accessToken", token.AccessToken },
             { "refreshToken", token.RefreshToken },
             { "tokenExpiry", (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + token.ExpiresIn * 1000).ToString() },
-            { "idToken", token.IdToken }
+            { "idToken", token.IdToken },
+            { "userProfile", token.UserProfile }
         });
 
         return token;
@@ -102,48 +110,45 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<bool> IsAuthenticatedAsync()
     {
+        return !string.IsNullOrWhiteSpace(await GetAccessTokenAsync());
+    }
+
+    public async Task<string?> GetAccessTokenAsync()
+    {
         try
         {
             var accessToken = await _storage.GetAccessTokenAsync();
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                _logger.LogWarning("Access token is not available.");
+                return null;
+            }
+
             var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-
-            if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(expiryStr))
+            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             {
-                return false;
+                _logger.LogWarning("Access token has expired or is invalid. Expiry: {TokenExpiry}", expiry);
+                return null;
             }
 
-            if (!long.TryParse(expiryStr, out var expiry))
-            {
-                return false;
-            }
-
-            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            return expiry > now;
+            return accessToken;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking authentication");
-            return false;
+            _logger.LogWarning(ex, "Error getting access token");
+            return null;
         }
     }
 
     public async Task<UserProfile?> GetCurrentUserAsync()
     {
+        if (string.IsNullOrWhiteSpace(await GetAccessTokenAsync()))
+        {
+            return null;
+        }
+
         try
         {
-            var accessToken = await _storage.GetAccessTokenAsync();
-            var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-
-            if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(expiryStr))
-            {
-                return null;
-            }
-
-            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-            {
-                return null;
-            }
-
             var userJson = await _storage.GetSingleStringAsync("userProfile");
             if (string.IsNullOrWhiteSpace(userJson))
             {
@@ -162,7 +167,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     private async Task<TokenResponse> ExchangeCodeForTokensAsync(string code)
     {
-        using var client = new HttpClient();
+        using var client = _httpClientFactory.CreateClient(nameof(BrowserExtensionMicrosoftAuthenticator));
 
         var content = new FormUrlEncodedContent(
         [
