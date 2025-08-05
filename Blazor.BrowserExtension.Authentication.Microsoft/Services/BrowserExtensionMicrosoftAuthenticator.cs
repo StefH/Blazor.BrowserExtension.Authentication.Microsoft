@@ -81,7 +81,8 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         var responseUrl = await _webExtensionsApi.Identity.LaunchWebAuthFlow(new LaunchWebAuthFlowDetails
         {
-            Url = new HttpUrl(authUri.ToString())
+            Url = new HttpUrl(authUri.ToString()),
+            Interactive = true // Always use interactive mode for authentication
         });
         if (responseUrl == null)
         {
