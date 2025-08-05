@@ -144,7 +144,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     {
         if (string.IsNullOrWhiteSpace(await GetAccessTokenAsync()))
         {
-            return null;
+            await AuthenticateAsync();
         }
 
         try
