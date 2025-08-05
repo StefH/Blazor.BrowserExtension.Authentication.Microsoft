@@ -226,14 +226,13 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         var payload = parts[1];
         payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
         var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload.Replace('-', '+').Replace('_', '/')));
-        var claims = JsonSerializer.Deserialize<JwtPayload>(json)!;
+        var claims = JsonSerializer.Deserialize<IdTokenJwtPayload>(json)!;
 
         return new UserProfile
         {
-            DisplayName = claims.Name,
             Name = claims.Name,
             Email = claims.Email,
-            UserPrincipalName = claims.Upn
+            UserPrincipalName = claims.Upn ?? claims.PreferredUsername ?? claims.Email
         };
     }
 }

@@ -4,9 +4,6 @@ namespace Blazor.BrowserExtension.Authentication.Microsoft.Models;
 
 public class UserProfile
 {
-    [JsonPropertyName("displayName")]
-    public string DisplayName { get; set; } = null!;
-
     [JsonPropertyName("name")]
     public string Name { get; set; } = null!;
 
@@ -14,5 +11,5 @@ public class UserProfile
     public string Email { get; set; } = null!;
 
     [JsonPropertyName("userPrincipalName")]
-    public string UserPrincipalName { get; set; } = null!;
+    public string? UserPrincipalName { get; set; }
 }
