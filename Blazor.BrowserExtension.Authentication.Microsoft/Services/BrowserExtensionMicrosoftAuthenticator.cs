@@ -82,7 +82,16 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         var responseUrl = await _webExtensionsApi.Identity.LaunchWebAuthFlow(new LaunchWebAuthFlowDetails
         {
             Url = new HttpUrl(authUri.ToString()),
-            Interactive = true // Always use interactive mode for authentication
+
+            // Fix for "Error: User interaction required. Try setting `abortOnLoadForNonInteractive` and `timeoutMsForNonInteractive` if multiple navigations are required, or if code is used for redirects in the authorization page after it's loaded."
+            AdditionalData = new Dictionary<string, object>
+            {
+                { "abortOnLoadForNonInteractive", true },
+                { "timeoutMsForNonInteractive", 10000 }
+            },
+
+            // Always use interactive mode for authentication
+            Interactive = true
         });
         if (responseUrl == null)
         {
