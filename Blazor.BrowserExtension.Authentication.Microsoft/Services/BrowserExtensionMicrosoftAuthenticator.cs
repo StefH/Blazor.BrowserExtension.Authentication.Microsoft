@@ -7,6 +7,9 @@ using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using WebExtensions.Net;
+using WebExtensions.Net.Identity;
+using WebExtensions.Net.Manifest;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 
@@ -14,8 +17,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 {
     private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
     private readonly IIHttpClientFactory _httpClientFactory;
-    private readonly IChromeIdentity _chromeIdentity;
-    private readonly IChromeStorageLocal _storage;
+    private readonly IWebExtensionsApi _webExtensionsApi;
 
     private readonly string _clientId;
     private readonly string _scopes;
@@ -29,8 +31,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         ILogger<BrowserExtensionMicrosoftAuthenticator> logger,
         IConfiguration config,
         IIHttpClientFactory httpClientFactory,
-        IChromeIdentity chromeIdentity,
-        IChromeStorageLocal storage)
+        IWebExtensionsApi webExtensionsApi)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
@@ -43,14 +44,13 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _chromeIdentity = chromeIdentity;
-        _storage = storage;
+        _webExtensionsApi = webExtensionsApi;
     }
 
     public async Task SignOutAsync()
     {
         _logger.LogInformation("Signing out from Microsoft OAuth flow");
-        await _storage.RemoveTokenAsync();
+        await _webExtensionsApi.Storage.Local.RemoveTokenAsync();
 
         _pkceCodeVerifier = null;
         _redirectUrl = null;
@@ -60,9 +60,9 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
     {
         _logger.LogInformation("Starting Microsoft OAuth flow");
 
-        await _storage.RemoveTokenAsync();
+        await _webExtensionsApi.Storage.Local.RemoveTokenAsync();
 
-        _redirectUrl = await _chromeIdentity.GetRedirectUrlAsync();
+        _redirectUrl = _webExtensionsApi.Identity.GetRedirectURL();
 
         var (codeVerifier, codeChallenge) = GeneratePkceParams();
         _pkceCodeVerifier = codeVerifier;
@@ -79,16 +79,20 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
                     $"&code_challenge_method=S256"
         }.Uri;
 
-        var responseUrl = await _chromeIdentity.LaunchInteractiveWebAuthFlowAsync(authUri);
+        var responseUrl = await _webExtensionsApi.Identity.LaunchWebAuthFlow(new LaunchWebAuthFlowDetails
+        {
+            Url = new HttpUrl(authUri.ToString())
+        });
         if (responseUrl == null)
         {
-            throw new AuthenticationException("LaunchInteractiveWebAuthFlow did not return a valid response Url.");
+            throw new AuthenticationException("Identity.LaunchWebAuthFlow did not return a valid response Url.");
         }
 
         _logger.LogDebug("ResponseUrl: {ResponseUrl}", responseUrl);
 
-        var code = HttpUtility.ParseQueryString(responseUrl.Query).Get("code");
-        var error = HttpUtility.ParseQueryString(responseUrl.Query).Get("error");
+        var responseUri = new Uri(responseUrl);
+        var code = HttpUtility.ParseQueryString(responseUri.Query).Get("code");
+        var error = HttpUtility.ParseQueryString(responseUri.Query).Get("error");
 
         if (!string.IsNullOrEmpty(error))
         {
@@ -107,7 +111,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             token.UserProfile = ParseIdToken(token.IdToken);
         }
 
-        await _storage.StoreTokenAsync(token);
+        await _webExtensionsApi.Storage.Local.StoreTokenAsync(token);
 
         return token;
     }
@@ -119,15 +123,15 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<string?> GetAccessTokenAsync()
     {
-        var accessToken = await _storage.GetAccessTokenAsync();
+        var accessToken = await _webExtensionsApi.Storage.Local.GetAccessTokenAsync();
         if (string.IsNullOrWhiteSpace(accessToken))
         {
             _logger.LogInformation("Access token is not available.");
             return null;
         }
 
-        var expiryStr = await _storage.GetSingleStringAsync(nameof(TokenResponse.ExpiresIn));
-        if (!long.TryParse(expiryStr, out var expiry) || expiry <= TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds())
+        var expiry = await _webExtensionsApi.Storage.Local.GetLongAsync(nameof(TokenResponse.ExpiresIn));
+        if (expiry == null || expiry <= TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds())
         {
             _logger.LogInformation("Access token has expired or is invalid. Expiry: {ExpiresIn}", expiry);
             return null;
@@ -145,14 +149,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         try
         {
-            var userJson = await _storage.GetSingleStringAsync(nameof(TokenResponse.UserProfile));
-            if (string.IsNullOrWhiteSpace(userJson))
-            {
-                return null;
-            }
-
-            var userProfile = JsonSerializer.Deserialize<UserProfile>(userJson);
-            return userProfile;
+            return await _webExtensionsApi.Storage.Local.GetPropertyAsync<UserProfile>(nameof(TokenResponse.UserProfile));
         }
         catch (Exception ex)
         {
