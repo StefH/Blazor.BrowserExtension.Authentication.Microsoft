@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Threading.Tasks;
 using JsBind.Net;
 using StorageData = System.Collections.Generic.Dictionary<string, object?>;
 
@@ -12,8 +11,6 @@ internal sealed class ChromeStorageLocal : ObjectBindingBase, IChromeStorageLoca
         SetAccessPath("chrome.storage.local");
         Initialize(jsRuntime);
     }
-
-    public StorageData? Get(string key) => Invoke<StorageData>("get", key);
 
     public JsonElement? GetSingle(string key)
     {
@@ -37,9 +34,7 @@ internal sealed class ChromeStorageLocal : ObjectBindingBase, IChromeStorageLoca
 
     public void Set(string key, object? value) => InvokeVoid("set", new StorageData { { key, value } });
 
-    public void Remove(string key) => InvokeVoid("remove", key);
-
-    public void Remove(string[] keys) => InvokeVoid("remove", keys);
+    public void Remove(params string[] keys) => InvokeVoid("remove", keys, null);
 
     public void Clear() => InvokeVoid("clear");
 
@@ -47,37 +42,33 @@ internal sealed class ChromeStorageLocal : ObjectBindingBase, IChromeStorageLoca
 
     public int GetBytesInUse(params string[] keys) => Invoke<int>("getBytesInUse", keys);
 
-    public async Task<StorageData?> GetAsync(string key) => await InvokeAsync<StorageData>("get", key);
-
-    public async Task<JsonElement?> GetSingleAsync(string key)
+    public async ValueTask<JsonElement?> GetSingleAsync(string key)
     {
         var result = await GetAsync(key);
         return result != null && result.TryGetValue(key, out var value) && value is JsonElement element ? element : null;
     }
 
-    public async Task<string?> GetSingleStringAsync(string key)
+    public async ValueTask<string?> GetSingleStringAsync(string key)
     {
         var result = await GetSingleAsync(key);
         return result?.GetString();
     }
 
-    public async Task<StorageData?> GetAsync(params string[] keys) => await InvokeAsync<StorageData>("get", keys);
+    public ValueTask<StorageData?> GetAsync(params string[] keys) => InvokeAsync<StorageData>("get", keys);
 
-    public async Task<StorageData?> GetAsync(StorageData keys) => await InvokeAsync<StorageData>("get", keys);
+    public ValueTask<StorageData?> GetAsync(StorageData keys) => InvokeAsync<StorageData>("get", keys);
 
-    public async Task<StorageData?> GetAllAsync() => await InvokeAsync<StorageData>("get", (object?)null);
+    public ValueTask<StorageData?> GetAllAsync() => InvokeAsync<StorageData>("get", (object?)null);
 
-    public async Task SetAsync(StorageData items) => await InvokeVoidAsync("set", items);
+    public ValueTask SetAsync(StorageData items) => InvokeVoidAsync("set", items);
 
-    public async Task SetAsync(string key, object? value) => await InvokeVoidAsync("set", new StorageData { { key, value } });
+    public ValueTask SetAsync(string key, object? value) => InvokeVoidAsync("set", new StorageData { { key, value } });
 
-    public async Task RemoveAsync(string key) => await InvokeVoidAsync("remove", key);
+    public ValueTask RemoveAsync(params string[] keys) => InvokeVoidAsync("remove", keys, null);
 
-    public async Task RemoveAsync(params string[] keys) => await InvokeVoidAsync("remove", keys);
+    public ValueTask ClearAsync() => InvokeVoidAsync("clear");
 
-    public async Task ClearAsync() => await InvokeVoidAsync("clear");
+    public ValueTask<int> GetBytesInUseAsync(string? key = null) => key == null ? InvokeAsync<int>("getBytesInUse") : InvokeAsync<int>("getBytesInUse", key);
 
-    public async Task<int> GetBytesInUseAsync(string? key = null) => key == null ? await InvokeAsync<int>("getBytesInUse") : await InvokeAsync<int>("getBytesInUse", key);
-
-    public async Task<int> GetBytesInUseAsync(params string[] keys) => await InvokeAsync<int>("getBytesInUse", keys);
+    public ValueTask<int> GetBytesInUseAsync(params string[] keys) => InvokeAsync<int>("getBytesInUse", keys);
 }

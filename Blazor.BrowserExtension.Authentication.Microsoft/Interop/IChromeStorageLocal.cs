@@ -1,14 +1,10 @@
-﻿using System;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 using StorageData = System.Collections.Generic.Dictionary<string, object?>;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 
 public interface IChromeStorageLocal : IDisposable, IAsyncDisposable
 {
-    StorageData? Get(string key);
-
     StorageData? Get(params string[] keys);
 
     StorageData? Get(StorageData keys);
@@ -23,8 +19,6 @@ public interface IChromeStorageLocal : IDisposable, IAsyncDisposable
 
     void Set(string key, object? value);
 
-    void Remove(string key);
-
     void Remove(string[] keys);
 
     void Clear();
@@ -33,29 +27,25 @@ public interface IChromeStorageLocal : IDisposable, IAsyncDisposable
 
     int GetBytesInUse(params string[] keys);
 
-    Task<StorageData?> GetAsync(string key);
+    ValueTask<StorageData?> GetAsync(params string[] keys);
 
-    Task<StorageData?> GetAsync(params string[] keys);
+    ValueTask<StorageData?> GetAsync(StorageData keys);
 
-    Task<StorageData?> GetAsync(StorageData keys);
+    ValueTask<JsonElement?> GetSingleAsync(string key);
 
-    Task<JsonElement?> GetSingleAsync(string key);
+    ValueTask<string?> GetSingleStringAsync(string key);
 
-    Task<string?> GetSingleStringAsync(string key);
+    ValueTask<StorageData?> GetAllAsync();
 
-    Task<StorageData?> GetAllAsync();
+    ValueTask SetAsync(StorageData items);
 
-    Task SetAsync(StorageData items);
+    ValueTask SetAsync(string key, object? value);
+    
+    ValueTask RemoveAsync(params string[] keys);
 
-    Task SetAsync(string key, object? value);
+    ValueTask ClearAsync();
 
-    Task RemoveAsync(string key);
+    ValueTask<int> GetBytesInUseAsync(string? key = null);
 
-    Task RemoveAsync(params string[] keys);
-
-    Task ClearAsync();
-
-    Task<int> GetBytesInUseAsync(string? key = null);
-
-    Task<int> GetBytesInUseAsync(params string[] keys);
+    ValueTask<int> GetBytesInUseAsync(params string[] keys);
 }

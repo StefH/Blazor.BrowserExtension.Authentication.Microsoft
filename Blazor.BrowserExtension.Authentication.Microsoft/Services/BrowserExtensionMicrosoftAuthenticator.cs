@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Security.Authentication;
+﻿using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Web;
 using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Models;
@@ -51,9 +47,20 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         _storage = storage;
     }
 
+    public async Task SignOutAsync()
+    {
+        _logger.LogInformation("Signing out from Microsoft OAuth flow");
+        await _storage.RemoveTokenAsync();
+
+        _pkceCodeVerifier = null;
+        _redirectUrl = null;
+    }
+
     public async Task<TokenResponse> AuthenticateAsync()
     {
         _logger.LogInformation("Starting Microsoft OAuth flow");
+
+        await _storage.RemoveTokenAsync();
 
         _redirectUrl = await _chromeIdentity.GetRedirectUrlAsync();
 
@@ -72,11 +79,16 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
                     $"&code_challenge_method=S256"
         }.Uri;
 
-        var responseUrl = (await _chromeIdentity.LaunchInteractiveWebAuthFlowAsync(authUri.ToString()))!;
+        var responseUrl = await _chromeIdentity.LaunchInteractiveWebAuthFlowAsync(authUri);
+        if (responseUrl == null)
+        {
+            throw new AuthenticationException("LaunchInteractiveWebAuthFlow did not return a valid response Url.");
+        }
+
         _logger.LogDebug("ResponseUrl: {ResponseUrl}", responseUrl);
 
-        var code = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("code");
-        var error = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("error");
+        var code = HttpUtility.ParseQueryString(responseUrl.Query).Get("code");
+        var error = HttpUtility.ParseQueryString(responseUrl.Query).Get("error");
 
         if (!string.IsNullOrEmpty(error))
         {
@@ -95,15 +107,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             token.UserProfile = ParseIdToken(token.IdToken);
         }
 
-        await _storage.SetAsync(new Dictionary<string, object?>
-        {
-            { "tokenType", token.TokenType },
-            { "accessToken", token.AccessToken },
-            { "refreshToken", token.RefreshToken },
-            { "tokenExpiry", (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + token.ExpiresIn * 1000).ToString() },
-            { "idToken", token.IdToken },
-            { "userProfile", token.UserProfile }
-        });
+        await _storage.StoreTokenAsync(token);
 
         return token;
     }
@@ -115,29 +119,21 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<string?> GetAccessTokenAsync()
     {
-        try
+        var accessToken = await _storage.GetAccessTokenAsync();
+        if (string.IsNullOrWhiteSpace(accessToken))
         {
-            var accessToken = await _storage.GetAccessTokenAsync();
-            if (string.IsNullOrWhiteSpace(accessToken))
-            {
-                _logger.LogWarning("Access token is not available.");
-                return null;
-            }
-
-            var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-            {
-                _logger.LogWarning("Access token has expired or is invalid. Expiry: {TokenExpiry}", expiry);
-                return null;
-            }
-
-            return accessToken;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error getting access token");
+            _logger.LogInformation("Access token is not available.");
             return null;
         }
+
+        var expiryStr = await _storage.GetSingleStringAsync(nameof(TokenResponse.ExpiresIn));
+        if (!long.TryParse(expiryStr, out var expiry) || expiry <= TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds())
+        {
+            _logger.LogInformation("Access token has expired or is invalid. Expiry: {ExpiresIn}", expiry);
+            return null;
+        }
+
+        return accessToken;
     }
 
     public async Task<UserProfile?> GetCurrentUserAsync()
@@ -149,7 +145,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         try
         {
-            var userJson = await _storage.GetSingleStringAsync("userProfile");
+            var userJson = await _storage.GetSingleStringAsync(nameof(TokenResponse.UserProfile));
             if (string.IsNullOrWhiteSpace(userJson))
             {
                 return null;
@@ -160,7 +156,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error getting current user");
+            _logger.LogInformation(ex, "Error getting current user");
             return null;
         }
     }

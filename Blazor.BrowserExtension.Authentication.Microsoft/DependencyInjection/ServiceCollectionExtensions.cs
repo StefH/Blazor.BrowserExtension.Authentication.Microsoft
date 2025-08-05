@@ -1,6 +1,4 @@
-﻿using System;
-using System.Net.Http;
-using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
+﻿using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Services;
 using Microsoft.Extensions.DependencyInjection;
 

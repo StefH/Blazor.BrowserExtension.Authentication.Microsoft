@@ -1,15 +1,12 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 
-namespace Blazor.BrowserExtension.Authentication.Microsoft.Interop;
-
-public interface IChromeIdentity: IDisposable, IAsyncDisposable
+public interface IChromeIdentity : IDisposable, IAsyncDisposable
 {
-    string? LaunchInteractiveWebAuthFlow(string url);
+    Uri? LaunchInteractiveWebAuthFlow(Uri url);
 
-    Task<string?> LaunchInteractiveWebAuthFlowAsync(string url);
+    ValueTask<Uri?> LaunchInteractiveWebAuthFlowAsync(Uri url);
 
     string? GetRedirectUrl();
 
-    Task<string?> GetRedirectUrlAsync();
+    ValueTask<string?> GetRedirectUrlAsync();
 }
