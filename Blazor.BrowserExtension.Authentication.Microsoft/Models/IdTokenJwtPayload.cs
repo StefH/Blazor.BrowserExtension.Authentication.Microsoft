@@ -2,7 +2,7 @@
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Models;
 
-public class JwtPayload
+public class IdTokenJwtPayload
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = null!;
@@ -13,9 +13,9 @@ public class JwtPayload
 
 
     [JsonPropertyName("upn")]
-    public string Upn { get; set; } = null!;
+    public string? Upn { get; set; }
 
 
     [JsonPropertyName("preferred_username")]
-    public string PreferredUsername { get; set; } = null!;
+    public string? PreferredUsername { get; set; }
 }

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Net.Http;
-using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
-using Blazor.BrowserExtension.Authentication.Microsoft.Services;
+﻿using Blazor.BrowserExtension.Authentication.Microsoft.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 // ReSharper disable once CheckNamespace
@@ -19,10 +16,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(nameof(BrowserExtensionMicrosoftAuthenticator));
 
         return services
-            .AddJsBind()
+            .AddWebExtensions()
             .AddSingleton<IIHttpClientFactory, HttpClientFactoryService>()
-            .AddSingleton<IChromeStorageLocal, ChromeStorageLocal>()
-            .AddSingleton<IChromeIdentity, ChromeIdentity>()
             .AddSingleton<IBrowserExtensionMicrosoftAuthenticator, BrowserExtensionMicrosoftAuthenticator>();
     }
 }

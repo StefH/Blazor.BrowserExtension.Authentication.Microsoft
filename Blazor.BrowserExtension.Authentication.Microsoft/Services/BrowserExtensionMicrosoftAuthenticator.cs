@@ -1,16 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Security.Authentication;
+﻿using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Web;
 using Blazor.BrowserExtension.Authentication.Microsoft.Interop;
 using Blazor.BrowserExtension.Authentication.Microsoft.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using WebExtensions.Net;
+using WebExtensions.Net.Identity;
+using WebExtensions.Net.Manifest;
 
 namespace Blazor.BrowserExtension.Authentication.Microsoft.Services;
 
@@ -18,8 +17,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 {
     private readonly ILogger<BrowserExtensionMicrosoftAuthenticator> _logger;
     private readonly IIHttpClientFactory _httpClientFactory;
-    private readonly IChromeIdentity _chromeIdentity;
-    private readonly IChromeStorageLocal _storage;
+    private readonly IWebExtensionsApi _webExtensionsApi;
 
     private readonly string _clientId;
     private readonly string _scopes;
@@ -33,8 +31,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         ILogger<BrowserExtensionMicrosoftAuthenticator> logger,
         IConfiguration config,
         IIHttpClientFactory httpClientFactory,
-        IChromeIdentity chromeIdentity,
-        IChromeStorageLocal storage)
+        IWebExtensionsApi webExtensionsApi)
     {
         _clientId = config.GetSection("AzureAd:ClientId").Get<string>() ?? throw new ArgumentException("ClientId is not configured.");
 
@@ -47,15 +44,25 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _chromeIdentity = chromeIdentity;
-        _storage = storage;
+        _webExtensionsApi = webExtensionsApi;
+    }
+
+    public async Task SignOutAsync()
+    {
+        _logger.LogInformation("Signing out from Microsoft OAuth flow");
+        await _webExtensionsApi.Storage.Local.RemoveTokenAsync();
+
+        _pkceCodeVerifier = null;
+        _redirectUrl = null;
     }
 
     public async Task<TokenResponse> AuthenticateAsync()
     {
         _logger.LogInformation("Starting Microsoft OAuth flow");
 
-        _redirectUrl = await _chromeIdentity.GetRedirectUrlAsync();
+        await _webExtensionsApi.Storage.Local.RemoveTokenAsync();
+
+        _redirectUrl = _webExtensionsApi.Identity.GetRedirectURL();
 
         var (codeVerifier, codeChallenge) = GeneratePkceParams();
         _pkceCodeVerifier = codeVerifier;
@@ -72,11 +79,30 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
                     $"&code_challenge_method=S256"
         }.Uri;
 
-        var responseUrl = (await _chromeIdentity.LaunchInteractiveWebAuthFlowAsync(authUri.ToString()))!;
+        var responseUrl = await _webExtensionsApi.Identity.LaunchWebAuthFlow(new LaunchWebAuthFlowDetails
+        {
+            Url = new HttpUrl(authUri.ToString()),
+
+            // Fix for "Error: User interaction required. Try setting `abortOnLoadForNonInteractive` and `timeoutMsForNonInteractive` if multiple navigations are required, or if code is used for redirects in the authorization page after it's loaded."
+            AdditionalData = new Dictionary<string, object>
+            {
+                { "abortOnLoadForNonInteractive", true },
+                { "timeoutMsForNonInteractive", 30000 }
+            },
+
+            // Always use interactive mode for authentication
+            Interactive = true
+        });
+        if (responseUrl == null)
+        {
+            throw new AuthenticationException("Identity.LaunchWebAuthFlow did not return a valid response Url.");
+        }
+
         _logger.LogDebug("ResponseUrl: {ResponseUrl}", responseUrl);
 
-        var code = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("code");
-        var error = HttpUtility.ParseQueryString(new Uri(responseUrl).Query).Get("error");
+        var responseUri = new Uri(responseUrl);
+        var code = HttpUtility.ParseQueryString(responseUri.Query).Get("code");
+        var error = HttpUtility.ParseQueryString(responseUri.Query).Get("error");
 
         if (!string.IsNullOrEmpty(error))
         {
@@ -95,15 +121,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             token.UserProfile = ParseIdToken(token.IdToken);
         }
 
-        await _storage.SetAsync(new Dictionary<string, object?>
-        {
-            { "tokenType", token.TokenType },
-            { "accessToken", token.AccessToken },
-            { "refreshToken", token.RefreshToken },
-            { "tokenExpiry", (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + token.ExpiresIn * 1000).ToString() },
-            { "idToken", token.IdToken },
-            { "userProfile", token.UserProfile }
-        });
+        await _webExtensionsApi.Storage.Local.StoreTokenAsync(token);
 
         return token;
     }
@@ -115,52 +133,37 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
 
     public async Task<string?> GetAccessTokenAsync()
     {
-        try
+        var accessToken = await _webExtensionsApi.Storage.Local.GetAccessTokenAsync();
+        if (string.IsNullOrWhiteSpace(accessToken))
         {
-            var accessToken = await _storage.GetAccessTokenAsync();
-            if (string.IsNullOrWhiteSpace(accessToken))
-            {
-                _logger.LogWarning("Access token is not available.");
-                return null;
-            }
-
-            var expiryStr = await _storage.GetSingleStringAsync("tokenExpiry");
-            if (!long.TryParse(expiryStr, out var expiry) || expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-            {
-                _logger.LogWarning("Access token has expired or is invalid. Expiry: {TokenExpiry}", expiry);
-                return null;
-            }
-
-            return accessToken;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error getting access token");
+            _logger.LogInformation("Access token is not available.");
             return null;
         }
+
+        var expiry = await _webExtensionsApi.Storage.Local.GetLongAsync(nameof(TokenResponse.ExpiresIn));
+        if (expiry == null || expiry <= TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds())
+        {
+            _logger.LogInformation("Access token has expired or is invalid. Expiry: {ExpiresIn}", expiry);
+            return null;
+        }
+
+        return accessToken;
     }
 
     public async Task<UserProfile?> GetCurrentUserAsync()
     {
         if (string.IsNullOrWhiteSpace(await GetAccessTokenAsync()))
         {
-            return null;
+            await AuthenticateAsync();
         }
 
         try
         {
-            var userJson = await _storage.GetSingleStringAsync("userProfile");
-            if (string.IsNullOrWhiteSpace(userJson))
-            {
-                return null;
-            }
-
-            var userProfile = JsonSerializer.Deserialize<UserProfile>(userJson);
-            return userProfile;
+            return await _webExtensionsApi.Storage.Local.GetPropertyAsync<UserProfile>(nameof(TokenResponse.UserProfile));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error getting current user");
+            _logger.LogInformation(ex, "Error getting current user");
             return null;
         }
     }
@@ -230,14 +233,13 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
         var payload = parts[1];
         payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
         var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload.Replace('-', '+').Replace('_', '/')));
-        var claims = JsonSerializer.Deserialize<JwtPayload>(json)!;
+        var claims = JsonSerializer.Deserialize<IdTokenJwtPayload>(json)!;
 
         return new UserProfile
         {
-            DisplayName = claims.Name,
             Name = claims.Name,
             Email = claims.Email,
-            UserPrincipalName = claims.Upn
+            UserPrincipalName = claims.Upn ?? claims.PreferredUsername ?? claims.Email
         };
     }
 }

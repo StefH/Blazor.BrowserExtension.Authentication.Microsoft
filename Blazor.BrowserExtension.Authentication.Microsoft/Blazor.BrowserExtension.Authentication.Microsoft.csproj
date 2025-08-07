@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.0.2</Version>
+    <Version>0.0.3-preview-07</Version>
     <Description>This package adds Microsoft Authentication to a Blazor.BrowserExtension using chrome.identity.launchWebAuthFlow functionality.</Description>
     <TargetFramework>net8.0</TargetFramework>
-    <!--<ImplicitUsings>enable</ImplicitUsings>-->
+    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <Copyright>Copyright © Stef Heyenrath</Copyright>
@@ -27,8 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="IHttpClient" Version="0.0.8" />
-    <PackageReference Include="JsBind.Net.Extensions.DependencyInjection" Version="2.0.1" PrivateAssets="contentfiles" />
+    <PackageReference Include="IHttpClient" Version="0.0.8.1" />
+    <PackageReference Include="WebExtensions.Net.Extensions.DependencyInjection" Version="4.1.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
   </ItemGroup>
