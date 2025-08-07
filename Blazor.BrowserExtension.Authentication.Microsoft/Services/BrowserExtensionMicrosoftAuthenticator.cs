@@ -87,7 +87,7 @@ internal class BrowserExtensionMicrosoftAuthenticator : IBrowserExtensionMicroso
             AdditionalData = new Dictionary<string, object>
             {
                 { "abortOnLoadForNonInteractive", true },
-                { "timeoutMsForNonInteractive", 10000 }
+                { "timeoutMsForNonInteractive", 30000 }
             },
 
             // Always use interactive mode for authentication
